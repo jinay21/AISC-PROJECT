@@ -10,7 +10,7 @@ const Simulation = (() => {
   function service(s,i){
     const e=s.elevators[i];
     for(const p of s.requests) if(p.assigned===i&&p.picked!==null&&p.completed===null&&p.to===e.floor){p.completed=s.time;e.load--;}
-    for(const p of s.requests) if(p.assigned===i&&p.picked===null&&p.from===e.floor&&(e.load===0||e.direction===p.direction)) {p.picked=s.time;e.load++;if(e.direction===0)e.direction=p.direction;}
+    for(const p of s.requests) if(p.assigned===i&&p.picked===null&&p.from===e.floor&&(e.load===0||e.direction===p.direction)) {if(e.load===0)e.direction=p.direction;p.picked=s.time;e.load++;}
   }
   function tick(s){
     for(let i=0;i<3;i++) service(s,i);

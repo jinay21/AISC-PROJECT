@@ -1,72 +1,80 @@
 # Smart Multi-Elevator Scheduling using Hill Climbing
 
-A small browser-only AI course project. HTML, CSS, and plain JavaScript; no dependencies, APIs, backend, database, or installation required.
+A browser-only AI course project: HTML, CSS, and plain JavaScript. No dependencies, API, backend, database, or installation. Capacity is unlimited.
 
-## Run
+## Run and demonstrate
 
-Open `index.html` in a browser. Keep the `src` folder beside it. It also works from a static server, for example `python3 -m http.server 5173` from this folder.
+Open `index.html` in a browser with the `src` folder alongside it. Or run `python3 -m http.server 5173` in this folder.
 
-1. Click **Load preset demo** to create the five requested journeys.
-2. Click **Step** to explain each move, or **Start simulation** for animation.
-3. Inspect the request table, elevator cards, and scheduling decision.
-4. Switch between **Normal Scheduler** and **AI Scheduler**. Switching preserves the current simulation and reschedules waiting passengers; onboard passengers never change elevator.
-5. Click **Run comparison** for an independent, fair 25-request experiment. This does not alter the visual simulation.
+1. Load the five-request preset, or add manual/random requests.
+2. Press **Step** to explain each move, or **Start simulation** for animation.
+3. Both schedulers receive the same arrivals and advance one tick together. The selected mode determines which building, request table, and decision panel you see.
+4. Comparison updates automatically. Switching modes does not reschedule, reset, or mix their histories.
+5. **Reset** clears both simulations, their requests, decisions, and comparison metrics.
+6. **Load 25-request demo** starts a fresh pair of simulations with the same reproducible batch (seed 42). Press Start or Step to advance it. Both preset buttons replace the current run.
 
-Reset and Load preset demo replace the current visual run. Requests are created manually or with the random button; the animation does not silently create requests. All state is in memory and resets on page reload.
+All data is in memory. Waiting averages include picked-up passengers only; live comparisons are provisional because the schedulers may have picked up different passengers. Pickup counts are shown alongside the comparison. The animation stops automatically only when BOTH runs finish.
 
-## Files to explain in the viva
+## Why this cost formula?
 
-- `src/hillClimbing.js`: standalone steepest-improvement Hill Climbing algorithm.
-- `src/scheduler.js`: nearest-elevator initial assignment and AI cost evaluation.
-- `src/simulation.js`: shared elevator movement, pickup, drop-off, and statistics.
-- `src/app.js`: controls, rendering, and reproducible comparison experiment.
-- `src/styles.css`: responsive interface.
-- `test.cjs`: optional automated checks (`node test.cjs`). Node is only needed for tests, not the app.
+```
+cost = total predicted remaining waiting + remaining travel + 5 × future reversals
+```
 
-## Viva explanation
+- **Waiting:** Sum of remaining steps until pickup across all waiting passengers. Reducing this improves passenger service. Delaying three passengers one step contributes three units.
+- **Travel:** Total floors that all elevators still need to move to deliver the current requests. This discourages avoidable movement. It is a simple proxy, not measured electricity consumption.
+- **Reversals:** Changes between successive nonzero movement directions. Penalizing them encourages route continuity and discourages backtracking. Travel already captures detours; this extra term expresses an additional preference for fewer reversals.
+- **Weights 1, 1, 5:** Design choices for this teaching simulation, not learned parameters, physical constants, or proven optimal values. One reversal is treated as equivalent to five extra floor moves or five passenger-wait steps. We combine unlike quantities into a dimensionless score; the weights express priorities. Changing them changes the tradeoff.
 
-**Problem:** Assign waiting passengers among three elevators efficiently.
+The original version also included a load-balancing term, as suggested in the initial brief. Its per-elevator penalty was `2 × n(n−1)/2`, where n was onboard plus assigned waiting passengers. For four passengers, placing everyone in one elevator contributed 12; a 2+2 split contributed 4. That could reward splitting a useful shared pickup. With unlimited capacity, the term is unnecessary and has been removed. Passenger counts remain visible.
 
-**State:** An array such as `[0, 2, 1]`: P1 → E1, P2 → E3, P3 → E2.
+**Viva answer:** “I use a weighted heuristic to balance passenger delay, movement, and reversals. Waiting measures service quality, distance discourages wasted movement, and the reversal weight favors continuing a useful route. Five is an illustrative priority, not an experimentally optimal value. Hill Climbing minimizes this combined score, so it does not guarantee that every metric improves separately.”
 
-**Initial state:** Assign each waiting passenger to the geographically nearest elevator. Ties go to the lower elevator ID.
+Example: assignment A has 8 wait steps, 12 floor moves, and 0 reversals: cost 20. B has 6 wait steps, 10 moves, and 2 reversals: cost 26. A wins under this preference even though B has less waiting and travel. This demonstrates the tradeoff explicitly.
 
-**Neighbour:** Change one waiting passenger's elevator.
+## Shared pickups
 
-**Cost:** Predicted remaining waiting time + remaining elevator travel + 5 × future direction changes + 2 × load penalty. Evaluate a candidate by copying the current simulation and running its assigned routes to completion with no future arrivals. This is deterministic simulation, not a shortest-path search or machine learning.
+All currently waiting passengers with the same pickup floor AND direction form one pickup group. The scheduler assigns the entire group to one elevator, with no capacity limit. For example, 4→7 and 4→9 share a pickup; 4→1 is a separate downward group. Both baseline and AI use this rule.
 
-For each elevator, `n` is its onboard plus assigned waiting passengers. Its load penalty is `n × (n − 1) / 2`, the sum of the loads seen when adding those passengers one by one. This discourages concentrating requests on one elevator. Passenger capacity is unlimited, as requested; the count affects the heuristic only.
+Passengers arriving after an earlier group boarded are a new waiting group and can get another elevator. Opposite directions can also justify different elevators at the same floor. Onboard passengers never change elevators.
 
-**Algorithm:** Enumerate every one-passenger reassignment. Move to the cheapest neighbour only if its cost is strictly lower. Repeat until no neighbour improves the cost. The trace displays accepted costs and evaluation count. A strict decrease prevents cycles. No random restarts or other search algorithms are used.
+## Hill Climbing in the viva
 
-**Limitation:** The result is a local optimum. Joint changes might help even when no single change does. Future requests are unknown, so lower predicted cost does not guarantee lower waiting, travel, and reversals individually.
+- **State:** An elevator assignment for each waiting pickup group, e.g. `[0,2,1]`.
+- **Initial state:** Nearest-elevator assignments; ties go to the lower ID.
+- **Neighbour:** Change exactly one pickup group's elevator. When a group has one passenger, this is the original one-passenger reassignment.
+- **Evaluation:** Copy the simulation, apply the candidate assignments, then run the same movement rules until all existing requests finish. Do not assume future requests.
+- **Move:** Choose the lowest-cost neighbour only when strictly cheaper.
+- **Stop:** No single-group reassignment improves cost: a local optimum, not necessarily the global optimum.
 
-## Movement model
+Grouping is a deliberate simplification for unlimited-capacity pickups. The search cannot split a same-floor, same-direction group even if splitting could occasionally improve a different objective. Strict improvements prevent cycles. There is no A*, shortest-path algorithm, machine learning, or random restart.
 
-Ten floors (0–9), starting elevator floors 0, 4, and 9. Each tick services the current floor, moves each elevator at most one floor, advances time, and services the arrival floor. Doors take no extra time. Onboard destinations determine movement first; continue in the current direction if possible, otherwise reverse toward the nearest destination. Empty elevators head toward assigned pickups. Compatible assigned passengers are collected along the route. Pickup always precedes delivery; passengers are never teleported or transferred.
+The decision panel evaluates moving the latest request's whole group while keeping the other optimized groups fixed. Values are total assignment costs, not isolated costs for one elevator. It also displays the chosen cost's waiting/travel/reversal breakdown and the improvement trace.
 
-Scheduling runs when requests arrive or the selected method changes, optimizing all still-waiting passengers. The normal mode uses the same rescheduling opportunities and movement rules. Stops display unique immediate pickup/drop-off floors, not an ordered itinerary. Destination becomes an immediate stop after pickup.
+## Movement and metrics
 
-## Statistics and fair comparison
+Three elevators start at floors 0, 4, and 9; floors are bounded to 0–9. Each tick services the current floor, moves at most one floor, advances time, and services the arrival floor. Doors add no extra delay. Onboard destinations determine direction first; continue forward if possible, otherwise reverse. Empty elevators head toward assigned pickups. Compatible assigned passengers board en route. An empty car arriving from the opposite direction turns to the group's direction and boards the whole group.
 
-- Waiting: pickup tick minus creation tick, averaged over passengers already picked up. Unpicked passengers show their elapsed waiting in the request table.
-- Distance: total one-floor elevator moves.
-- Completed: passengers actually dropped at their destination.
-- Direction changes: changes between successive nonzero travel directions, including a reversal after idling. The first departure is not a reversal.
+Scheduling runs for both methods whenever requests arrive. Waiting groups may be reassigned; onboard passengers stay assigned. Pending stops are unique immediate pickup/drop-off floors, not an ordered itinerary; a destination becomes immediate after pickup.
 
-The comparison uses a fixed pseudorandom seed (42), 25 requests arriving every three steps, identical initial positions, and the same movement model. Both runs continue until all passengers finish. It computes every value at runtime.
+- Waiting = pickup tick − creation tick, averaged over picked-up passengers.
+- Distance = total one-floor moves.
+- Completed = actual drop-offs.
+- Reversals = changes between successive nonzero directions, including after idling. First departure is not a reversal.
 
-Measured default results:
+## Small code map
 
-| Metric | Normal | Hill Climbing |
-|---|---:|---:|
-| Average waiting (steps) | 2.40 | 2.36 |
-| Travel (floors) | 101 | 122 |
-| Direction changes | 23 | 17 |
-| Completed | 25 | 25 |
-
-This workload shows a small waiting improvement and fewer reversals, with extra travel. Do not claim universal superiority or hide that tradeoff. The five-passenger preset shows an estimated assignment cost reduction from 47 to 31. Change the experiment seed in `src/app.js` to explore other workloads.
+- `src/hillClimbing.js`: generic Hill Climbing loop, isolated for the viva.
+- `src/scheduler.js`: shared pickup groups, baseline, heuristic, AI decisions.
+- `src/simulation.js`: movement, pickup, delivery, statistics.
+- `src/comparison.js`: two independent runs with identical arrivals and clocks.
+- `src/app.js`: interface and controls.
+- `src/styles.css`: responsive styling.
 
 ## Verification
 
-`node test.cjs` checks five different 25-request workloads, delivery completion, floor bounds, passenger counts, pickup-before-drop-off, a busy pickup floor, strictly decreasing Hill Climbing costs, and a known toy optimum.
+Optional: `node test.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, and exact displayed cost breakdowns. Node is needed only for tests.
+
+## Original backup
+
+The unchanged first version was pushed to the private repository https://github.com/jinay21/smart-multi-elevator-scheduling before these changes, commit `c23416c` on `main`. The revised local version includes live comparison and shared pickups.
