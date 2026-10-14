@@ -17,7 +17,7 @@ const Simulation = (() => {
     for(let i=0;i<3;i++){
       const e=s.elevators[i];
       const active=s.requests.filter(p=>p.assigned===i&&p.completed===null);
-      // Deliver onboard passengers first; collect compatible passengers en route.
+      // Deliver onboard passengers first; collect the whole assigned floor group en route.
       const onboard=active.filter(p=>p.picked!==null);
       const floors=(onboard.length?onboard:active).map(p=>p.picked===null?p.from:p.to).filter(f=>f!==e.floor);
       let forward=floors.filter(f=>Math.sign(f-e.floor)===e.direction);
@@ -30,6 +30,17 @@ const Simulation = (() => {
     s.time++;
     for(let i=0;i<3;i++){service(s,i);s.elevators[i].stops=[...new Set(targets(s,i))];if(!s.elevators[i].stops.length)s.elevators[i].direction=0;}
   }
-  function metrics(s){const picked=s.requests.filter(p=>p.picked!==null);return {wait:picked.length?picked.reduce((a,p)=>a+p.picked-p.created,0)/picked.length:0,distance:s.elevators.reduce((a,e)=>a+e.distance,0),turns:s.elevators.reduce((a,e)=>a+e.turns,0),completed:s.requests.filter(p=>p.completed!==null).length,picked:picked.length};}
+  function metrics(s) {
+    const total = s.requests.length;
+    const picked = s.requests.filter(p => p.picked !== null).length;
+    const completed = s.requests.filter(p => p.completed !== null).length;
+    // Count actual elapsed waiting NOW, including passengers not yet picked up.
+    // After pickup, waiting freezes at picked-created. No future wait is invented.
+    const totalWait = s.requests.reduce((sum,p) => sum + (p.picked ?? s.time) - p.created, 0);
+    return {wait:total ? totalWait / total : 0, totalWait, total, waiting:total-picked,
+      onboard:picked-completed, picked, completed,
+      distance:s.elevators.reduce((sum,e) => sum+e.distance,0),
+      turns:s.elevators.reduce((sum,e) => sum+e.turns,0)};
+  }
   return {create,clone,add,tick,metrics};
 })();

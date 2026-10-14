@@ -11,9 +11,9 @@ Open `index.html` in a browser with the `src` folder alongside it. Or run `pytho
 3. Both schedulers receive the same arrivals and advance one tick together. The selected mode determines which building, request table, and decision panel you see.
 4. Comparison updates automatically. Switching modes does not reschedule, reset, or mix their histories.
 5. **Reset** clears both simulations, their requests, decisions, and comparison metrics.
-6. **Load 25-request demo** starts a fresh pair of simulations with the same reproducible batch (seed 42). Press Start or Step to advance it. Both preset buttons replace the current run.
+6. The comparison has **Start both / Pause both** and **Reset both** controls. These control the same two simulations as the top toolbar. There is no separate comparison experiment or 25-request demo button.
 
-All data is in memory. Waiting averages include picked-up passengers only; live comparisons are provisional because the schedulers may have picked up different passengers. Pickup counts are shown alongside the comparison. The animation stops automatically only when BOTH runs finish.
+All data is in memory. Live average waiting includes elapsed waiting for EVERY request: `(pickup time, or current time if still waiting) − arrival time`, divided by total requests. Each waiting passenger therefore contributes on every step before pickup. After pickup, their wait freezes. The comparison table shows total, waiting, onboard, and completed counts for each scheduler. Adding a request updates counts immediately; travel and elapsed time change when the simulation advances. Start keeps both simulations running until you explicitly Pause or Reset, including when elevators are idle, so later requests are served automatically.
 
 ## Why this cost formula?
 
@@ -36,13 +36,13 @@ Example: assignment A has 8 wait steps, 12 floor moves, and 0 reversals: cost 20
 
 All currently waiting passengers with the same pickup floor AND direction form one pickup group. The scheduler assigns the entire group to one elevator, with no capacity limit. For example, 4→7 and 4→9 share a pickup; 4→1 is a separate downward group. Both baseline and AI use this rule.
 
-Passengers arriving after an earlier group boarded are a new waiting group and can get another elevator. Opposite directions can also justify different elevators at the same floor. Onboard passengers never change elevators.
+Identical requests added while paused are all still waiting and therefore share one group and one elevator. Once those passengers have boarded, later arrivals form a new group and all three elevators are evaluated again. Another lift may serve them if its cost is lower. There is no permanent route reservation. Opposite directions remain separate groups. Onboard passengers never change elevator.
 
 ## Hill Climbing in the viva
 
 - **State:** An elevator assignment for each waiting pickup group, e.g. `[0,2,1]`.
 - **Initial state:** Nearest-elevator assignments; ties go to the lower ID.
-- **Neighbour:** Change exactly one pickup group's elevator. When a group has one passenger, this is the original one-passenger reassignment.
+- **Neighbour:** Change exactly one waiting pickup group's elevator. When a group has one passenger, this is the original one-passenger reassignment.
 - **Evaluation:** Copy the simulation, apply the candidate assignments, then run the same movement rules until all existing requests finish. Do not assume future requests.
 - **Move:** Choose the lowest-cost neighbour only when strictly cheaper.
 - **Stop:** No single-group reassignment improves cost: a local optimum, not necessarily the global optimum.
@@ -53,11 +53,11 @@ The decision panel evaluates moving the latest request's whole group while keepi
 
 ## Movement and metrics
 
-Three elevators start at floors 0, 4, and 9; floors are bounded to 0–9. Each tick services the current floor, moves at most one floor, advances time, and services the arrival floor. Doors add no extra delay. Onboard destinations determine direction first; continue forward if possible, otherwise reverse. Empty elevators head toward assigned pickups. Compatible assigned passengers board en route. An empty car arriving from the opposite direction turns to the group's direction and boards the whole group.
+Three elevators start at floors 0, 4, and 9; floors are bounded to 0–9. Each tick services the current floor, moves at most one floor, advances time, and services the arrival floor. Doors add no extra delay. Onboard destinations determine direction first; continue forward if possible, otherwise reverse. Empty elevators head toward assigned pickups. Same-direction assigned passengers board en route. An empty car arriving from the opposite direction turns to the group's direction and boards the whole group.
 
 Scheduling runs for both methods whenever requests arrive. Waiting groups may be reassigned; onboard passengers stay assigned. Pending stops are unique immediate pickup/drop-off floors, not an ordered itinerary; a destination becomes immediate after pickup.
 
-- Waiting = pickup tick − creation tick, averaged over picked-up passengers.
+- Waiting so far = `(pickup tick, or current tick if waiting) − creation tick`, averaged over all requests. Once everyone is picked up this is the final average waiting time.
 - Distance = total one-floor moves.
 - Completed = actual drop-offs.
 - Reversals = changes between successive nonzero directions, including after idling. First departure is not a reversal.
@@ -73,7 +73,7 @@ Scheduling runs for both methods whenever requests arrive. Waiting groups may be
 
 ## Verification
 
-Optional: `node test.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, and exact displayed cost breakdowns. Node is needed only for tests.
+Optional: `node test.cjs` and `node test-ui.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, exact displayed cost breakdowns, waiting before pickup, cost-based scheduling of later arrivals, and the actual UI event handlers for adding, stepping, running, pausing, and resetting. Node is needed only for tests.
 
 ## Original backup
 

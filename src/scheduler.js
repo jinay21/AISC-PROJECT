@@ -1,6 +1,6 @@
 const Scheduler = (() => {
-  // Unlimited capacity: passengers waiting at the same floor in the same
-  // direction share a pickup. Opposite directions remain separate groups.
+  // Unlimited capacity: same-floor, same-direction passengers share a pickup.
+  // After pickup, new arrivals form a new waiting group and are cost-optimized.
   function pickupGroups(waiting) {
     const groups = new Map();
     for (const p of waiting) {
@@ -55,7 +55,7 @@ const Scheduler = (() => {
       groupSize:group.length, chosen, candidateCosts, ...result,
       breakdown:evaluate(result.assignment),
       reason: group.length > 1
-        ? `${group.length} waiting passengers on this floor going ${latest.direction === 1 ? 'up' : 'down'} share one elevator; capacity is unlimited.`
+        ? `${group.length} waiting passengers on this floor going in the same direction share one elevator and board together.`
         : mode === 'normal' ? 'Nearest elevator by floor distance.'
         : aligned ? 'Already moving toward the pickup in the passenger’s direction.'
         : 'This assignment balances predicted waiting, travel, and direction reversals.'

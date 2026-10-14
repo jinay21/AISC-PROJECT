@@ -11,9 +11,14 @@ function invariants(s) {
   assert(s.requests.every(p => p.completed === null || (p.picked !== null && p.completed >= p.picked)), 'Pickup before delivery');
   s.elevators.forEach((e,i) => assert(e.load === s.requests.filter(p => p.assigned === i && p.picked !== null && p.completed === null).length, 'Onboard count'));
 }
+function workload(seed) {
+ let value=seed;
+ const random=()=>{value=(Math.imul(1664525,value)+1013904223)>>>0;return value/4294967296;};
+ return Array.from({length:25},()=>{const from=Math.floor(random()*10);let to=Math.floor(random()*9);if(to>=from)to++;return [from,to];});
+}
 for (const seed of [1,7,42,123,999]) {
   const runs = Comparison.create();
-  const arrivals = Comparison.demo(seed);
+  const arrivals = workload(seed);
   for(let time=0;time<500;time++) {
     if(time%3 === 0 && time/3 < arrivals.length) Comparison.addBatch(runs,[arrivals[time/3]]);
     Comparison.tick(runs);
@@ -41,8 +46,8 @@ for (const mode of ['normal','ai']) {
 const runs=Comparison.create();
 Comparison.addBatch(runs,[[4,9],[4,7],[4,1]]);
 for(const s of [runs.ai,runs.normal]) {
-  assert(Scheduler.pickupGroups(s.requests).length===2,'Opposite directions are separate pickup groups');
-  assert(s.requests[0].assigned===s.requests[1].assigned,'Compatible requests stay together');
+  assert(Scheduler.pickupGroups(s.requests).length===2,'Opposite directions remain separate groups');
+  assert(s.requests[0].assigned===s.requests[1].assigned,'Same-floor same-direction requests stay together');
 }
 Comparison.tick(runs);
 Comparison.addBatch(runs,[[2,8]]);
@@ -56,6 +61,40 @@ assert(rejected && runs.ai.requests.length===4 && runs.normal.requests.length===
 const d=runs.ai.decision;
 assert(d.history.every((c,i,a)=>i===0||c<a[i-1]),'Hill Climbing strictly improves');
 assert(d.cost===d.breakdown.wait+d.breakdown.distance+5*d.breakdown.reversals,'Displayed breakdown matches actual cost');
+const live=Comparison.create();
+Comparison.addBatch(live,[[2,9]]);
+Comparison.tick(live);
+for(const s of [live.normal,live.ai]) {
+ const m=Simulation.metrics(s);
+ assert(m.wait===1 && m.totalWait===1 && m.waiting===1,'Waiting updates BEFORE pickup');
+}
+Comparison.addBatch(live,[[2,9],[2,8]]);
+for(const s of [live.normal,live.ai]) {
+ const m=Simulation.metrics(s);
+ assert(m.total===3 && m.waiting===3 && m.totalWait===1,'New requests enter live comparison immediately');
+ assert(new Set(s.requests.map(p=>p.assigned)).size===1,'Same-direction arrivals share existing floor pickup');
+}
+for(let t=0;t<100&&!Comparison.finished(live);t++)Comparison.tick(live);
+assert(Comparison.finished(live),'Shared pickup group finishes');
+for(const s of [live.normal,live.ai]){
+ assert(new Set(s.requests.map(p=>p.picked)).size===1,'Whole same-direction group boards together');
+ const measured=s.requests.reduce((sum,p)=>sum+p.picked-p.created,0)/s.requests.length;
+ assert(Simulation.metrics(s).wait===measured,'Final waiting equals actual pickup waiting');
+}
+const duplicates=Comparison.create();
+for(let i=0;i<8;i++)Comparison.addBatch(duplicates,[[2,9]]);
+for(const s of [duplicates.normal,duplicates.ai]) {
+ assert(s.time===0,'Adding paused requests does not advance time');
+ assert(new Set(s.requests.map(p=>p.assigned)).size===1,'All paused identical requests share one elevator');
+}
+for(let t=0;t<100&&!Comparison.finished(duplicates);t++)Comparison.tick(duplicates);
+for(const s of [duplicates.normal,duplicates.ai])assert(s.elevators.filter(e=>e.distance>0).length===1,'One lift serves paused identical requests');
+const departed=Comparison.create();
+Comparison.addBatch(departed,[[0,9]]);
+for(let t=0;t<8;t++)Comparison.tick(departed);
+Comparison.addBatch(departed,[[0,9]]);
+assert(departed.ai.requests[1].assigned!==departed.ai.requests[0].assigned,'New arrival can use cheaper idle lift after first lift departed');
+assert(departed.ai.decision.candidateCosts.every(Number.isFinite),'All elevators remain candidates for later arrivals');
 const optimum=hillClimbing([0,0],a=>(a[0]-1)**2+(a[1]-1)**2,[0,1,2]);
 assert(optimum.cost===0,'Known toy optimum');
 console.log('All live comparison, shared pickup, movement, and Hill Climbing tests passed.');
