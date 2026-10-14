@@ -8,12 +8,14 @@ Open `index.html` in a browser with the `src` folder alongside it. Or run `pytho
 
 1. Load the five-request preset, or add manual/random requests.
 2. Press **Step** to explain each move, or **Start simulation** for animation.
-3. Both schedulers receive the same arrivals and advance one tick together. The selected mode determines which building, request table, and decision panel you see.
-4. Comparison updates automatically. Switching modes does not reschedule, reset, or mix their histories.
-5. **Reset** clears both simulations, their requests, decisions, and comparison metrics.
-6. The comparison has **Start both / Pause both** and **Reset both** controls. These control the same two simulations as the top toolbar. There is no separate comparison experiment or 25-request demo button.
+3. The selected mode chooses which building and live metrics you see. Both schedulers receive the same arrivals and advance together.
+4. Click **Compare schedulers** at any time—even before starting the animation. It independently replays all requests entered so far from the original starting floors, preserving their recorded arrival ticks, and runs both schedulers until every passenger is delivered. It does not advance or modify the visible simulation.
+5. Results remain unchanged as the animation progresses or new requests are added. The badge shows how many new requests have not been compared yet. **Compare again** recomputes final results for ALL current requests, not just new ones.
+6. **Reset** clears both live runs, recorded arrivals, and the saved comparison. The five-request preset also starts a fresh run. There is no 25-request demo.
 
-All data is in memory. Live average waiting includes elapsed waiting for EVERY request: `(pickup time, or current time if still waiting) − arrival time`, divided by total requests. Each waiting passenger therefore contributes on every step before pickup. After pickup, their wait freezes. The comparison table shows total, waiting, onboard, and completed counts for each scheduler. Adding a request updates counts immediately; travel and elapsed time change when the simulation advances. Start keeps both simulations running until you explicitly Pause or Reset, including when elevators are idle, so later requests are served automatically.
+A step is one simulation tick: an elevator can move at most one floor per tick. Start automatically pauses when both live runs finish. Start and Step do nothing while there is no work, so the counter never runs indefinitely while idle. New requests can be added afterward; press Start to animate them or Compare to calculate their final results directly.
+
+All data is in memory. The live metric cards use elapsed waiting across all requests, including passengers not yet picked up. Comparison instead shows final waiting after everyone is delivered in its independent replay. Waiting is measured as pickup tick minus arrival tick; the replay has no unserved requests. All statistics are calculated, never hard-coded.
 
 ## Why this cost formula?
 
@@ -67,13 +69,13 @@ Scheduling runs for both methods whenever requests arrive. Waiting groups may be
 - `src/hillClimbing.js`: generic Hill Climbing loop, isolated for the viva.
 - `src/scheduler.js`: shared pickup groups, baseline, heuristic, AI decisions.
 - `src/simulation.js`: movement, pickup, delivery, statistics.
-- `src/comparison.js`: two independent runs with identical arrivals and clocks.
+- `src/comparison.js`: recorded arrivals, independent live runs, and on-demand replay through completion.
 - `src/app.js`: interface and controls.
 - `src/styles.css`: responsive styling.
 
 ## Verification
 
-Optional: `node test.cjs` and `node test-ui.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, exact displayed cost breakdowns, waiting before pickup, cost-based scheduling of later arrivals, and the actual UI event handlers for adding, stepping, running, pausing, and resetting. Node is needed only for tests.
+Optional: `node test.cjs` and `node test-ui.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, exact displayed cost breakdowns, waiting before pickup, cost-based scheduling of later arrivals, and the actual UI handlers for Compare, Compare again, frozen results, screen-state preservation, idle timer stopping, and Reset. Node is needed only for tests.
 
 ## Original backup
 
