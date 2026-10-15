@@ -1,6 +1,6 @@
 # Smart Multi-Elevator Scheduling using Hill Climbing
 
-A browser-only AI course project: HTML, CSS, and plain JavaScript. No dependencies, API, backend, database, or installation. Capacity is unlimited.
+A browser-only AI course project: HTML, CSS, and plain JavaScript. No dependencies, API, backend, database, or installation. Capacity is unlimited. Select 1–6 elevators and 1–30 total floors, including Ground.
 
 ## Run and demonstrate
 
@@ -16,6 +16,16 @@ Open `index.html` in a browser with the `src` folder alongside it. Or run `pytho
 A step is one simulation tick: an elevator can move at most one floor per tick. Start automatically pauses when both live runs finish. Start and Step do nothing while there is no work, so the counter never runs indefinitely while idle. New requests can be added afterward; press Start to animate them or Compare to calculate their final results directly.
 
 All data is in memory. The live metric cards use elapsed waiting across all requests, including passengers not yet picked up. Comparison instead shows final waiting after everyone is delivered in its independent replay. Waiting is measured as pickup tick minus arrival tick; the replay has no unserved requests. All statistics are calculated, never hard-coded.
+
+## Building settings
+
+The default is 3 elevators and 10 floors (Ground through Floor 9). Change **Elevators** and **Total floors**, then click **Apply & reset**. This stops animation, clears requests and saved comparison results, and rebuilds the building. Editing a selector alone does not alter the current run. Regular Reset preserves the applied settings.
+
+Elevators start evenly across the available floors using `floor(i × (floorCount − 1) / (elevatorCount − 1))`; a single elevator starts at Ground. The defaults therefore still start at 0, 4, and 9. More elevators than floors is allowed and some starting positions will coincide.
+
+With one total floor, only Ground exists. Passenger creation, the demo, and simulation controls are disabled because there is no valid journey. Choose at least two floors to enable them.
+
+Manual and random requests use the applied floor range. The preset scales its original floor numbers to the selected range and omits any resulting same-floor journeys; its button shows the resulting request count. Tall buildings scroll vertically and extra shafts scroll horizontally inside the building view. Comparison replays the same applied building size and starting positions.
 
 ## Why this cost formula?
 
@@ -55,7 +65,7 @@ The decision panel evaluates moving the latest request's whole group while keepi
 
 ## Movement and metrics
 
-Three elevators start at floors 0, 4, and 9; floors are bounded to 0–9. Each tick services the current floor, moves at most one floor, advances time, and services the arrival floor. Doors add no extra delay. Onboard destinations determine direction first; continue forward if possible, otherwise reverse. Empty elevators head toward assigned pickups. Same-direction assigned passengers board en route. An empty car arriving from the opposite direction turns to the group's direction and boards the whole group.
+The selected elevators start evenly across the selected floor range (0, 4, and 9 for the default configuration). Floors are bounded to 0 through floorCount − 1. Each tick services the current floor, moves at most one floor, advances time, and services the arrival floor. Doors add no extra delay. Onboard destinations determine direction first; continue forward if possible, otherwise reverse. Empty elevators head toward assigned pickups. Same-direction assigned passengers board en route. An empty car arriving from the opposite direction turns to the group's direction and boards the whole group.
 
 Scheduling runs for both methods whenever requests arrive. Waiting groups may be reassigned; onboard passengers stay assigned. Pending stops are unique immediate pickup/drop-off floors, not an ordered itinerary; a destination becomes immediate after pickup.
 
@@ -75,7 +85,7 @@ Scheduling runs for both methods whenever requests arrive. Waiting groups may be
 
 ## Verification
 
-Optional: `node test.cjs` and `node test-ui.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, exact displayed cost breakdowns, waiting before pickup, cost-based scheduling of later arrivals, and the actual UI handlers for Compare, Compare again, frozen results, screen-state preservation, idle timer stopping, and Reset. Node is needed only for tests.
+Optional: `node test.cjs` and `node test-ui.cjs`. Tests cover five 25-request workloads, same-floor grouping, opposite directions, boarding 20 passengers without a capacity restriction, pickup before delivery, floor bounds, synchronized arrival ticks, reset metrics, invalid-input atomicity, a known toy optimum, exact displayed cost breakdowns, waiting before pickup, cost-based scheduling of later arrivals, and the actual UI handlers for Compare, Compare again, frozen results, screen-state preservation, idle timer stopping, Reset, and applying building settings. Configurations tested include one floor, two floors with six elevators, the default, and thirty floors with six elevators; tests check configured bounds, valid assignments, shared pickups, full delivery, and replay agreement. Node is needed only for tests.
 
 ## Original backup
 

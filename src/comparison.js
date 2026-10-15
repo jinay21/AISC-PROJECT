@@ -1,10 +1,13 @@
 /* Two independent simulations receive identical requests at the same tick.
    The mode switch selects which one to display; it does not change either run. */
 const Comparison = (() => {
-  const create = () => ({normal:Simulation.create(), ai:Simulation.create(), arrivals:[]});
+  function create(settings) {
+    const config=Simulation.configuration(settings);
+    return {config,normal:Simulation.create(config),ai:Simulation.create(config),arrivals:[]};
+  }
   function addBatch(runs, journeys) {
     // Validate the whole batch before mutating either run.
-    const check = Simulation.create();
+    const check = Simulation.create(runs.config);
     journeys.forEach(([from, to]) => Simulation.add(check, from, to));
     runs.arrivals.push({time:runs.ai.time, journeys:journeys.map(j => [...j])});
     for (const mode of ['normal', 'ai']) {
@@ -19,8 +22,8 @@ const Comparison = (() => {
   const finished = runs => [runs.normal, runs.ai].every(s => s.requests.every(p => p.completed !== null));
   // Replay the recorded arrivals from the original starting floors. Only the
   // requests already entered are included; no future demand is generated.
-  function replay(arrivals) {
-    const replayRuns = create();
+  function replay(arrivals, settings) {
+    const replayRuns = create(settings);
     let next = 0;
     while (next < arrivals.length || !finished(replayRuns)) {
       // Skip idle gaps without changing any passenger's arrival or waiting time.
@@ -34,7 +37,7 @@ const Comparison = (() => {
       if (!finished(replayRuns)) tick(replayRuns);
     }
     return {normal:Simulation.metrics(replayRuns.normal), ai:Simulation.metrics(replayRuns.ai),
-      count:replayRuns.ai.requests.length};
+      config:replayRuns.config, count:replayRuns.ai.requests.length};
   }
   return {create, addBatch, tick, finished, replay};
 })();

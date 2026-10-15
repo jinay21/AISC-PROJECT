@@ -1,9 +1,24 @@
 /* Shared movement rules: both schedulers use exactly the same simulation. */
 const Simulation = (() => {
-  const create = () => ({time:0, elevators:[0,4,9].map((floor,i)=>({id:`E${i+1}`,floor,direction:0,lastDirection:0,load:0,distance:0,turns:0,stops:[]})),requests:[],decision:null});
+  function configuration({floorCount=10, elevatorCount=3}={}) {
+    if (!Number.isInteger(floorCount) || floorCount < 1 || floorCount > 30 ||
+        !Number.isInteger(elevatorCount) || elevatorCount < 1 || elevatorCount > 6)
+      throw Error('Choose 1–30 floors and 1–6 elevators.');
+    return {floorCount, elevatorCount};
+  }
+  function create(settings) {
+    const config=configuration(settings);
+    const elevators=Array.from({length:config.elevatorCount}, (_,i)=>({
+      id:`E${i+1}`,
+      floor:config.elevatorCount===1 ? 0 : Math.floor(i*(config.floorCount-1)/(config.elevatorCount-1)),
+      direction:0,lastDirection:0,load:0,distance:0,turns:0,stops:[]
+    }));
+    return {config,time:0,elevators,requests:[],decision:null};
+  }
   const clone = s => JSON.parse(JSON.stringify(s));
   function add(s,from,to){
-    if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to>9||to<0||from>9||from===to) throw Error('Choose two different floors between Ground and 9.');
+    const top=s.config.floorCount-1;
+    if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to>top||to<0||from>top||from===to) throw Error(`Choose two different floors between Ground and Floor ${top}.`);
     s.requests.push({id:`P${s.requests.length+1}`,from,to,direction:Math.sign(to-from),created:s.time,picked:null,completed:null,assigned:null});
   }
   function targets(s,i){return s.requests.filter(p=>p.assigned===i&&p.completed===null).map(p=>p.picked===null?p.from:p.to);}
@@ -13,8 +28,8 @@ const Simulation = (() => {
     for(const p of s.requests) if(p.assigned===i&&p.picked===null&&p.from===e.floor&&(e.load===0||e.direction===p.direction)) {if(e.load===0)e.direction=p.direction;p.picked=s.time;e.load++;}
   }
   function tick(s){
-    for(let i=0;i<3;i++) service(s,i);
-    for(let i=0;i<3;i++){
+    for(let i=0;i<s.elevators.length;i++) service(s,i);
+    for(let i=0;i<s.elevators.length;i++){
       const e=s.elevators[i];
       const active=s.requests.filter(p=>p.assigned===i&&p.completed===null);
       // Deliver onboard passengers first; collect the whole assigned floor group en route.
@@ -28,7 +43,7 @@ const Simulation = (() => {
       e.direction=direction;
     }
     s.time++;
-    for(let i=0;i<3;i++){service(s,i);s.elevators[i].stops=[...new Set(targets(s,i))];if(!s.elevators[i].stops.length)s.elevators[i].direction=0;}
+    for(let i=0;i<s.elevators.length;i++){service(s,i);s.elevators[i].stops=[...new Set(targets(s,i))];if(!s.elevators[i].stops.length)s.elevators[i].direction=0;}
   }
   function metrics(s) {
     const total = s.requests.length;
@@ -42,5 +57,5 @@ const Simulation = (() => {
       distance:s.elevators.reduce((sum,e) => sum+e.distance,0),
       turns:s.elevators.reduce((sum,e) => sum+e.turns,0)};
   }
-  return {create,clone,add,tick,metrics};
+  return {configuration,create,clone,add,tick,metrics};
 })();

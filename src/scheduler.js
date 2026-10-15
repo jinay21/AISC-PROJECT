@@ -15,7 +15,7 @@ const Scheduler = (() => {
     const waiting = s.requests.filter(p => p.picked === null);
     if (!waiting.length) return;
     const groups = pickupGroups(waiting);
-    const allowed = [0, 1, 2];
+    const allowed = s.elevators.map((_,i) => i);
     const initial = groups.map(group => allowed.reduce((best, i) =>
       Math.abs(s.elevators[i].floor - group[0].from) <
       Math.abs(s.elevators[best].floor - group[0].from) ? i : best, 0));

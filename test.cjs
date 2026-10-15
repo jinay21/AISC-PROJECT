@@ -7,7 +7,7 @@ for (const name of ['simulation','hillClimbing','scheduler','comparison']) {
 vm.runInContext(`
 function assert(ok, message) { if (!ok) throw Error(message); }
 function invariants(s) {
-  assert(s.elevators.every(e => e.floor >= 0 && e.floor <= 9 && e.load >= 0), 'Floor and load bounds');
+  assert(s.elevators.every(e => e.floor >= 0 && e.floor < s.config.floorCount && e.load >= 0), 'Floor and load bounds');
   assert(s.requests.every(p => p.completed === null || (p.picked !== null && p.completed >= p.picked)), 'Pickup before delivery');
   s.elevators.forEach((e,i) => assert(e.load === s.requests.filter(p => p.assigned === i && p.picked !== null && p.completed === null).length, 'Onboard count'));
 }
@@ -106,6 +106,38 @@ while(!Comparison.finished(replaySource))Comparison.tick(replaySource);
 assert(JSON.stringify(replayed.ai)===JSON.stringify(Simulation.metrics(replaySource.ai)),'Replay matches actual AI arrival timing');
 assert(JSON.stringify(replayed.normal)===JSON.stringify(Simulation.metrics(replaySource.normal)),'Replay matches actual normal arrival timing');
 assert(Comparison.replay([]).count===0,'Empty replay terminates');
+assert(Simulation.create().elevators.map(e=>e.floor).join(',')==='0,4,9','Default starting floors unchanged');
+for(const config of [{floorCount:1,elevatorCount:1},{floorCount:1,elevatorCount:6},{floorCount:2,elevatorCount:6},{floorCount:10,elevatorCount:3},{floorCount:30,elevatorCount:6},{floorCount:30,elevatorCount:1}]) {
+ const custom=Comparison.create(config);
+ assert(custom.ai.elevators.length===config.elevatorCount,'Configured elevator count');
+ invariants(custom.ai);invariants(custom.normal);
+ if(config.floorCount===1){
+  let invalid=false;try{Comparison.addBatch(custom,[[0,1]]);}catch{invalid=true;}
+  assert(invalid && custom.arrivals.length===0 && !custom.ai.requests.length,'One-floor building rejects journeys atomically');
+  assert(Comparison.replay([],config).count===0,'One-floor empty replay completes');
+  continue;
+ }
+ const top=config.floorCount-1;
+ Comparison.addBatch(custom,[[0,top],[0,top],[top,0]]);
+ for(const s of [custom.normal,custom.ai]) {
+  assert(s.requests[0].assigned===s.requests[1].assigned,'Configured shared pickups');
+  assert(s.decision.candidateCosts.length===config.elevatorCount,'Decision evaluates selected elevators');
+  assert(s.requests.every(p=>p.assigned>=0&&p.assigned<config.elevatorCount),'Valid configured assignments');
+ }
+ const original=JSON.stringify(custom);
+ const predicted=Comparison.replay(custom.arrivals,custom.config);
+ assert(JSON.stringify(custom)===original,'Configured Compare does not mutate live run');
+ for(let t=0;t<500&&!Comparison.finished(custom);t++) {
+  Comparison.tick(custom);invariants(custom.ai);invariants(custom.normal);
+ }
+ assert(Comparison.finished(custom),'All configured passengers delivered');
+ assert(JSON.stringify(predicted.ai)===JSON.stringify(Simulation.metrics(custom.ai)),'Configured AI replay equals live result');
+ assert(JSON.stringify(predicted.normal)===JSON.stringify(Simulation.metrics(custom.normal)),'Configured baseline replay equals live result');
+ assert(predicted.config.floorCount===config.floorCount && predicted.config.elevatorCount===config.elevatorCount,'Replay preserves config');
+}
+for(const invalid of [{floorCount:0},{floorCount:31},{floorCount:1.5},{elevatorCount:0},{elevatorCount:7},{elevatorCount:2.5}]) {
+ let rejected=false;try{Simulation.create(invalid);}catch{rejected=true;}assert(rejected,'Reject invalid building size');
+}
 const optimum=hillClimbing([0,0],a=>(a[0]-1)**2+(a[1]-1)**2,[0,1,2]);
 assert(optimum.cost===0,'Known toy optimum');
 console.log('All live comparison, shared pickup, movement, and Hill Climbing tests passed.');
