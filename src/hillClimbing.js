@@ -1,6 +1,7 @@
 /* Viva: a state is an array of elevator indices, one per waiting pickup group.
    A neighbour changes ONE pickup group's elevator. Strict improvement prevents cycles.
-   This is steepest-ascent hill climbing expressed as cost minimization.
+   This is Steepest Hill Climbing (best-neighbour / steepest improvement),
+   expressed as cost minimization: evaluate every immediate neighbour each round.
    It stops at a local optimum, which need not be the global optimum. */
 function hillClimbing(initialSolution, cost, allowedElevators) {
   let currentSolution = [...initialSolution];

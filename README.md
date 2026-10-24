@@ -56,7 +56,7 @@ For **G groups** and **E elevators**:
 
 Example: two groups, three elevators give **9 states** and **4 neighbours**.
 
-This implementation uses **steepest improvement Hill Climbing**: evaluate every immediate neighbour, accept the cheapest strictly better assignment, and repeat from that new state. Stop when no neighbour improves the cost. Scheduling runs when requests arrive; search rounds are separate from elevator movement ticks.
+This implementation uses **Steepest Hill Climbing (best-neighbour / steepest improvement)**: evaluate every immediate neighbour, accept the cheapest strictly better assignment, and repeat from that new state. Stop when no neighbour improves the cost. Scheduling runs when requests arrive; search rounds are separate from elevator movement ticks.
 
 ## The cost function
 
